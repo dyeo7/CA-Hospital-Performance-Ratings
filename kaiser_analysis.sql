@@ -17,66 +17,58 @@ longitude FLOAT
 );
 SELECT * FROM ca.perf;
 
---County Analysis
---wtih rollup, I combined 2 queries into 1
-SELECT year, COALESCE(county, 'Total') county, performance_measure, SUM(cases) AS "Total Cases", SUM(adverse_events) AS "Total Adverse Events", 
-AVG(risk_adjusted_rate) AS "Avg Risk Rate"
-FROM ca.perf
-WHERE county IN ('Los Angeles', 'Orange', 'San Diego', 'Riverside', 'San Bernardino')
-GROUP BY GROUPING SETS (year), performance_measure, ROLLUP (county)
-ORDER BY county NULLS LAST, year;
-
---County Analysis END
-
-
-
 -- Kaiser Foundation Hospital Analysis
 
 --identify high-risk kaiser hospitals by adverse events
-WITH kaiser_avg AS (SELECT AVG(adverse_events) AS "Avg Kaiser Adverse Event"
+WITH kaiser_avg AS (SELECT AVG(adverse_events) AS "Overall Avg Kaiser Adverse Events"
 FROM ca.perf
 WHERE hospital LIKE 'Kaiser%'
 ),
-highrisk_kaiser AS (SELECT hospital, AVG(adverse_events) AS adverse_events
+highrisk_kaiser AS (SELECT hospital, AVG(adverse_events) AS "Avg Adverse Events"
 FROM ca.perf
 WHERE hospital LIKE 'Kaiser%'
 GROUP BY hospital
 )
-SELECT hk.hospital, hk.adverse_events, ka."Avg Kaiser Adverse Event"
+SELECT hk.hospital, hk."Avg Adverse Events", ka."Overall Avg Kaiser Adverse Events"
 FROM highrisk_kaiser hk
-CROSS JOIN kaiser_avg ka 
-WHERE hk.adverse_events > ka."Avg Kaiser Adverse Event"
-ORDER BY hk.adverse_events DESC;
+JOIN kaiser_avg ka ON 1=1
+WHERE hk."Avg Adverse Events" > ka."Overall Avg Kaiser Adverse Events"
+ORDER BY hk."Avg Adverse Events" DESC;
 
---performance trends over 2017-22 LA County Kaiser hospitals
-SELECT hospital, 
-SUM(CASE WHEN year = '2017' THEN cases END) AS "2017 Total Cases",
-SUM(CASE WHEN year = '2018' THEN cases END) AS "2018 Total Cases",
-SUM(CASE WHEN year = '2019' THEN cases END) AS "2019 Total Cases",
-SUM(CASE WHEN year = '2020' THEN cases END) AS "2020 Total Cases",
-SUM(CASE WHEN year = '2021' THEN cases END) AS "2021 Total Cases",
-SUM(CASE WHEN year = '2022' THEN cases END) AS "2022 Total Cases"
+--identify high-risk kaiser hospitals by cases
+WITH kaiser_avg AS (SELECT AVG(cases) AS "Overall Avg Cases"
 FROM ca.perf
-WHERE county = 'Los Angeles' AND hospital LIKE 'Kaiser%'
-GROUP BY hospital;
+WHERE hospital LIKE 'Kaiser%'
+),
+cases_kaiser AS (SELECT hospital, AVG(cases) AS "Avg Cases"
+FROM ca.perf
+WHERE hospital LIKE 'Kaiser%'
+GROUP BY hospital
+)
+SELECT ck.hospital, ck."Avg Cases", ka."Overall Avg Cases"
+FROM cases_kaiser ck
+JOIN kaiser_avg ka ON 1=1
+WHERE ck."Avg Cases" > ka."Overall Avg Cases"
+ORDER BY ck."Avg Cases" DESC;
 
-
--- Performance trends over 2017-22 LA County Kaiser hospitals, by performance measure (type of illness)
+-- Performance trends over 2017-22 LA County Kaiser hospitals (# of cases, adverse events by performance measures)
 SELECT hospital, performance_measure,
 SUM(CASE WHEN year = '2017' THEN cases END) AS "2017 Total Cases",
 SUM(CASE WHEN year = '2018' THEN cases END) AS "2018 Total Cases",
 SUM(CASE WHEN year = '2019' THEN cases END) AS "2019 Total Cases",
 SUM(CASE WHEN year = '2020' THEN cases END) AS "2020 Total Cases",
 SUM(CASE WHEN year = '2021' THEN cases END) AS "2021 Total Cases",
- SUM(CASE WHEN year = '2022' THEN cases END) AS "2022 Total Cases"
+SUM(CASE WHEN year = '2022' THEN cases END) AS "2022 Total Cases",
+SUM(CASE WHEN year = '2017' THEN adverse_events END) AS "2017 Adverse Events",
+SUM(CASE WHEN year = '2018' THEN adverse_events END) AS "2018 Adverse Events",
+SUM(CASE WHEN year = '2019' THEN adverse_events END) AS "2019 Adverse Events",
+SUM(CASE WHEN year = '2020' THEN adverse_events END) AS "2020 Adverse Events",
+SUM(CASE WHEN year = '2021' THEN adverse_events END) AS "2021 Adverse Events",
+SUM(CASE WHEN year = '2022' THEN adverse_events END) AS "2022 Adverse Events"
 FROM ca.perf
-WHERE county = 'Los Angeles' AND hospital LIKE 'Kaiser%' 
+WHERE county = 'Los Angeles' AND hospital LIKE 'Kaiser%'
 GROUP BY hospital, performance_measure
 ORDER BY hospital, performance_measure;
-
-
-
-
 
 -- cte with ranking function of type of report by avg adverse events
 -- imi
